@@ -1,0 +1,324 @@
+{
+  "name": "AI Gmail Inbox Triage, Labeling & Auto-Draft Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "eb3fe007-3380-43c2-9ef2-0a725ce4d1d7",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "whTKSaSgY1ygYIKd",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "5f207b7a-2dca-4301-a820-5fdde0c3818a",
+              "leftValue": "={{ $json.From }}",
+              "rightValue": "no-reply",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "4512eb80-c56c-43ad-8ed0-d1789a74f967",
+              "leftValue": "={{ $json.From }}",
+              "rightValue": "no-reply",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "176ae9ad-e9aa-4fd2-b263-5abacc14f850",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "openai/gpt-oss-120b",
+          "mode": "id"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an executive inbox triage assistant. Analyze the incoming email and return ONLY a valid JSON object with three keys:\n1. \"category\": Must be strictly one of: \"AI: Sales\", \"AI: Support\", \"AI: Billing\", or \"AI: Other\".\n2. \"needs_reply\": Boolean (true if a human or business response is appropriate, false for newsletters, notifications, or spam).\n3. \"draft_reply\": A polite, concise, professional reply draft (plain text, no subject line). If needs_reply is false, return an empty string \"\"."
+            },
+            {
+              "content": "=From: {{ $json.From || $json.headers?.from || '' }}\nSubject: {{ $json.Subject || $json.headers?.subject || '' }}\nSnippet: {{ $json.snippet }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "store": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "4226e7fd-2398-476f-929f-e87c3dedd6a0",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "390bDvQQiniMMgUF",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.output[0].content[0].text;\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(cleaned);\n\nreturn [{\n  json: {\n    category: parsed.category,\n    needs_reply: parsed.needs_reply,\n    draft_reply: parsed.draft_reply\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -96
+      ],
+      "id": "05c0a4f6-79eb-464f-8008-ef509e6f4ec7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
+        "labelIds": "={{ [{\n  \"AI: Sales\": \"Label_9165002827575785673\",\n  \"AI: Support\": \"Label_2010231157196355245\",\n  \"AI: Billing\": \"Label_1373358595905902114\",\n  \"AI: Other\": \"Label_7012376490229618048\"\n}[$json.category]] }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "33da3af9-cb77-4cb6-9a43-db793dc0c1a1",
+      "name": "Add label to message",
+      "webhookId": "c62a92b7-a56c-4dc6-9177-a068b316a28b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "whTKSaSgY1ygYIKd",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "86c14689-a5a9-4c50-b127-75f99f9a2b7d",
+              "leftValue": "={{ $('Code in JavaScript').item.json.needs_reply }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1264,
+        -96
+      ],
+      "id": "2f6d7ef5-d72e-402c-bbc8-864e8e8d394c",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re: {{ $('Gmail Trigger').item.json.Subject }}",
+        "message": "={{ $('Code in JavaScript').item.json.draft_reply }}",
+        "options": {
+          "threadId": "={{ $('Gmail Trigger').item.json.threadId }}",
+          "sendTo": "={{ $('Gmail Trigger').item.json.From }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        -192
+      ],
+      "id": "2f2850d7-29f8-4a7f-8076-d467a566727b",
+      "name": "Create a draft",
+      "webhookId": "b388b24b-12b3-4749-9b74-12f73da2ce0c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "whTKSaSgY1ygYIKd",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Add label to message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label to message": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "747b4d97-e863-476c-b050-84d10ac8cfdf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9236bd99f27a5e30c8f6adacb3954ff31ed2f086fa19611672e63f705049306d"
+  },
+  "nodeGroups": [],
+  "id": "IOwiPFNbDACn9WKv",
+  "tags": [
+    {
+      "updatedAt": "2026-11-21T14:54:48.804Z",
+      "createdAt": "2026-11-21T14:54:48.804Z",
+      "id": "1LcXOZxJUS4t26SS",
+      "name": "AI Automation"
+    },
+    {
+      "updatedAt": "2026-11-21T14:55:22.252Z",
+      "createdAt": "2026-11-21T14:55:22.252Z",
+      "id": "44KxUVZ9MaZduNfU",
+      "name": "Inbox Triage"
+    },
+    {
+      "updatedAt": "2026-11-21T14:55:39.044Z",
+      "createdAt": "2026-11-21T14:55:39.044Z",
+      "id": "A6tWTgt55mk3dADg",
+      "name": "Auto-Draft"
+    },
+    {
+      "name": "LLM",
+      "id": "rvfOAn9eRvYOAvDz",
+      "updatedAt": "2026-11-21T14:56:38.324Z",
+      "createdAt": "2026-11-21T14:56:38.324Z"
+    },
+    {
+      "name": "Gmail",
+      "id": "s6iJCPYcJXzbHF9H",
+      "updatedAt": "2026-11-21T14:56:44.759Z",
+      "createdAt": "2026-11-21T14:56:44.759Z"
+    }
+  ]
+}
