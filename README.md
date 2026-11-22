@@ -29,3 +29,5 @@ An end-to-end automated inbox management workflow built in **n8n**. It monitors 
 * **AI / LLM:** Groq API (Llama 3.3)
 * **Scripting:** JavaScript (n8n Code Node)
 * **Integrations:** Gmail API (OAuth2)
+
+<img width="1190" height="416" alt="image" src="https://github.com/user-attachments/assets/3b5de682-d621-4856-a079-33f9386c9002" />
